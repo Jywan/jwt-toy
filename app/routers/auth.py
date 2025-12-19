@@ -15,13 +15,18 @@ from app.core.security import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # 임시 유저 (DB 연동 이전 테스트용도)
-_fake_user_db ={
+_fake_user_db = {
     "jywan@test.com": {
         "id": "jywan",
         "email": "jywan@test.com",
-        "password_hash": hash_password("test"),
+        "password_hash": None,
     }
 }
+
+def _ensure_fake_user():
+    u = _fake_user_db["jywan@test.com"]
+    if u["password_hash"] is None:
+        u["password_hash"] = hash_password("test")
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -33,6 +38,7 @@ class TokenResponse(BaseModel):
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, response: Response):
+    _ensure_fake_user()
     user = _fake_user_db.get(payload.email)
     if not user or not verify_password(payload.password, user["password_hash"]):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
