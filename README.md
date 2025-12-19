@@ -156,7 +156,13 @@ Refresh Token 쿠키 삭제
 
 8. 다음 단계 계획
 
+/auth/me (Access Token 검증 엔드포인트)
 
+PostgreSQL + SQLAlchemy + Alembic 연동
+
+Refresh Token DB 저장 및 재사용 탐지
+
+Role / Resource 기반 인가(RBAC)
 
 9. 목적
 
