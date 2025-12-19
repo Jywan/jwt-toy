@@ -49,3 +49,31 @@ def create_refresh_token(subject: str) -> str:
         "typ": "refresh",
     }
     return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+def decode_token(token: str) -> Dict[str, Any]:
+    """
+    Raises JWTError on invalid/expired token
+    """
+    return jwt.decode(
+        token,
+        settings.jwt_secret_key,
+        algorithms=[settings.jwt_algorithm],
+        audience=settings.jwt_audience,
+        issuer=settings.jwt_issuer
+    )
+
+def refresh_cookie_params() -> Dict[str, Any]:
+    # 개발환경에서만 secure=False 허용/ 운영에 붙일 경우 True.
+    secure = settings.env != "dev"
+    return {
+        "httponly": True,
+        "secure": secure,
+        "samesite": "lax",
+        "path": "/",
+    }
+
+def hash_refresh_token(token: str) -> str:
+    """
+    DB에 refresh token 원문 저장 금지. 추후 저장용 해시
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
