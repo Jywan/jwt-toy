@@ -5,5 +5,5 @@ def get_db() -> Generator:
     db = SessionLocal()
     try:
         yield db
-    except:
+    finally:
         db.close()

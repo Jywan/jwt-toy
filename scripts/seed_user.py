@@ -13,7 +13,7 @@ def main():
         if exists:
             print("user already exists:", EMAIL)
             return
-        u = User(email=EMAIL, password_hash=hash_password(PASSWORD))
+        u = User(email=EMAIL, password_hash=hash_password(PASSWORD), role="user")
         db.add(u)
         db.commit()
         db.refresh(u)

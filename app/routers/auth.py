@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import secrets
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Response, Request, status, Depends
 from pydantic import BaseModel, EmailStr
@@ -17,6 +18,7 @@ from app.core.security import (
     hash_refresh_token
 )
 from app.db.models import User, RefreshToken
+from app.core.auth_deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -29,7 +31,7 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 def _revoke_family(db: Session, family_id: str) -> None:
     db.query(RefreshToken).filter(RefreshToken.family_id == family_id).update(
@@ -41,11 +43,11 @@ def _revoke_family(db: Session, family_id: str) -> None:
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
     
-    user: User | None = db.query(User).filter(User.email == payload.email).first()
+    user: Optional[User] = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     
-    access = create_access_token(subject=str(user.id))
+    access = create_access_token(subject=str(user.id), extra_claims={"role": user.role})
     refresh = create_refresh_token(subject=str(user.id))
 
     # DB 저장(원문 저장 금지 -> 해시화)
@@ -92,7 +94,7 @@ def refresh(request: Request, response: Response, db: Session = Depends(get_db))
 
     # 2) DB에서 “해시”로 존재/폐기 여부 확인
     token_hash = hash_refresh_token(refresh_token)
-    rt: RefreshToken | None = (
+    rt: Optional[RefreshToken] = (
         db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
     )
 
@@ -152,3 +154,8 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)):
 
     response.delete_cookie(key="refresh_token", path="/")
     return Response(status_code=204)
+
+
+@router.get("/me")
+def me(user: User = Depends(get_current_user)):
+    return {"id": user.id, "email": user.email}
