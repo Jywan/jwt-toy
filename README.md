@@ -14,9 +14,9 @@
 - **Crypto**: bcrypt, passlib
 - **JWT Library**: python-jose
 - **Config**: pydantic-settings
+- **DB**: MySQL
+- **ORM / Migration**: SQLAlchemy, Alembic
 - **Dev Tool**: VS Code, Postman
-
-> DB 연동(PostgreSQL + SQLAlchemy + Alembic)은 다음 단계에서 진행 예정입니다.
 
 ---
 
@@ -34,9 +34,16 @@
 - 수명: 30일
 - 용도: Access Token 재발급
 
+---
+
 ### 보안 포인트
+
+- Access / Refresh Token 분리 전략
 - Refresh Token은 JavaScript에서 접근 불가(HttpOnly)
-- Refresh Token 회전(Rotation) 적용
+- Refresh Token **DB 영속화**
+- Refresh Token **원문 미저장 (SHA-256 해시 저장)**
+- Refresh Token **Rotation(회전)** 적용
+- 폐기된 Refresh Token 재사용 시 **세션 체인 전체 폐기**
 - 비밀번호는 bcrypt 해시로 저장
 
 ---
@@ -48,10 +55,18 @@
 | Method | Endpoint       | Description |
 |--------|----------------|-------------|
 | POST   | /auth/login    | 로그인 (Access 발급 + Refresh 쿠키 설정) |
-| POST   | /auth/refresh  | Refresh Token으로 Access 재발급 |
-| POST   | /auth/logout   | Refresh Token 쿠키 삭제 |
+| POST   | /auth/refresh  | Refresh Token 회전(Rotation) 및 Access 재발급 |
+| POST   | /auth/logout   | Refresh Token 폐기 및 쿠키 삭제 |
 
-> 현재는 **테스트용 fake user**를 메모리에 두고 인증 흐름을 검증하고 있습니다.
+---
+
+### 인증 / 보안 구현 상세
+
+- User 테이블 기반 인증
+- Refresh Token 테이블을 통한 토큰 관리
+- Refresh Token은 1회성 사용
+- 토큰 탈취/재사용 탐지 시 동일 family_id 전체 무효화
+- 로그아웃 시 Refresh Token 폐기
 
 ---
 
@@ -63,9 +78,16 @@ jwt-toy/
 │  ├─ main.py              # FastAPI 엔트리포인트
 │  ├─ core/
 │  │  ├─ config.py         # 환경변수 설정
-│  │  └─ security.py       # JWT / bcrypt 유틸
+│  │  ├─ security.py       # JWT / bcrypt / token 유틸
+│  │  └─ deps.py           # DB Session 의존성
+│  ├─ db/
+│  │  ├─ base.py           # SQLAlchemy Base
+│  │  └─ models.py         # User / RefreshToken 모델
 │  └─ routers/
 │     └─ auth.py           # 인증 API
+├─ alembic/                # DB 마이그레이션
+├─ scripts/
+│  └─ seed_user.py         # 초기 사용자 시드
 ├─ .env                    # 환경변수 (gitignore)
 ├─ requirements.txt
 ├─ README.md
@@ -88,6 +110,8 @@ REFRESH_TOKEN_EXPIRES_DAYS=30
 
 JWT_SECRET_KEY=CHANGE_ME_TO_A_LONG_RANDOM_SECRET
 JWT_ALGORITHM=HS256
+
+DATABASE_URL=mysql+pymysql://jwttoy:jwttoy_pw@localhost:3306/jwttoy
 ```
 
 ---
@@ -105,7 +129,22 @@ source .venv/bin/activate   # macOS/Linux
 pip install -r requirements.txt
 ```
 
-3. 서버 실행
+3. DB 실행 (Docker)
+```
+docker compose up -d
+```
+
+4. 마이그레이션 적용
+```
+alembic upgrade head
+```
+
+5. 테스트 사용자 생성
+```
+python -m script.seed_user
+```
+
+6. 서버 실행
 ```
 uvicorn app.main:app --reload
 ```
