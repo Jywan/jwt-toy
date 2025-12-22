@@ -1,0 +1,17 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: jwt-toy-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: jwttoy
+      MYSQL_USER: jwttoy
+      MYSQL_PASSWORD: jwttoy_pw
+    ports:
+      - "3306:3306"
+    command: ["--default-authentication-plugin=mysql_native_password"]
+    volumes:
+      - jwt_toy_mysql:/var/lib/mysql
+
+volumes:
+  jwt_toy_mysql:
